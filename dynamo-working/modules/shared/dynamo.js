@@ -20,29 +20,51 @@ class DynamoSvc {
       const parallelPromiseArray = [];
       for (let i = 0; i < batchArray.length; i += 1) {
         const marshalled = AWS.DynamoDB.Converter.marshall(batchArray[i]);
-        marshalledRequest.RequestItems[tableName].push({ PutRequest: { Item: marshalled } });
+        marshalledRequest.RequestItems[tableName].push({
+          PutRequest: { Item: marshalled },
+        });
       }
       console.log(marshalledRequest);
-      parallelPromiseArray.push(dynamodb.batchWriteItem(marshalledRequest).promise());
+      parallelPromiseArray.push(
+        dynamodb.batchWriteItem(marshalledRequest).promise(),
+      );
 
       // after the write data is batched into promises; fire all the promises off in parallel
 
       const result = await Promise.all(parallelPromiseArray);
-      // if (result.UnprocessedItems.length > 1) {
-      //   // Handle unprocessed items by waiting for waittime and then recursively run the function again
-      //   const unmarshalled = await AWS.DynamoDB.Converter.unmarshall(result.UnprocessedItems);
-      //   setTimeout((this.batchPutIntoDynamoDb(unmarshalled, tableName), waitTime += 1000));
-      // }
+      if (result.UnprocessedItems.length > 1) {
+        // Handle unprocessed items by waiting for waittime and then recursively run the function again
+        const unmarshalled = await AWS.DynamoDB.Converter.unmarshall(
+          result.UnprocessedItems,
+        );
+        setTimeout(
+          (this.batchPutIntoDynamoDb(unmarshalled, tableName),
+          (waitTime += 1000)),
+        );
+      }
       return true;
     } catch (err) {
       console.error(err);
     }
     return true;
   }
+
+  static async getItemFromDynamoDb(tableName, partitionKey, partitionKeyName, sortKey, sortKeyName) {
+    try {
+      const marshalledItems = AWS.DynamoDB.Converter.marshall({
+        [partitionKeyName]: partitionKey,
+        [sortKeyName]: sortKey,
+      }, tableName);
+      const result = await dynamodb.getItem(marshalledItems);
+      return result;
+    } catch (error) {
+      console.error(error);
+      return error;
+    }
+  }
 }
 
 module.exports = DynamoSvc;
-
 
 // batchPutIntoDynamoDb(data, tableName, waitTime = 1000) {
 
@@ -65,4 +87,4 @@ module.exports = DynamoSvc;
 // 		setTimeout(() => { }, waitTime)
 // 	}
 // 	catch() { }
-// }
+// }z
